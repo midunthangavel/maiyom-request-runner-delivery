@@ -1,0 +1,81 @@
+import { MapPin, Clock, IndianRupee } from "lucide-react";
+import { Mission, scenarioIcons, scenarioLabels } from "@/lib/mockData";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+
+interface Props {
+  mission: Mission;
+  showDistance?: boolean;
+  variant?: "default" | "compact";
+  index?: number;
+}
+
+const statusColors: Record<string, string> = {
+  open: "bg-success/10 text-success",
+  offered: "bg-warning/10 text-warning",
+  accepted: "bg-primary/10 text-primary",
+  in_transit: "bg-accent/10 text-accent",
+  delivered: "bg-muted text-muted-foreground",
+};
+
+const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: Props) => {
+  const navigate = useNavigate();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.35, ease: "easeOut" }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => navigate(`/mission/${mission.id}`)}
+      className="bg-card rounded-lg border border-border p-4 shadow-card cursor-pointer hover:shadow-elevated transition-shadow"
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{scenarioIcons[mission.scenario]}</span>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[mission.status]}`}>
+            {mission.status === "open" ? "Open" : mission.status === "offered" ? "Offers In" : mission.status.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}
+          </span>
+          {mission.scenario === "urgent" && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
+              Urgent
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-muted-foreground">{mission.createdAt}</span>
+      </div>
+
+      <h3 className="font-display font-semibold text-foreground mb-1">{mission.title}</h3>
+
+      {variant === "default" && (
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{mission.description}</p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <MapPin size={12} />
+          {mission.deliveryLocation.split(",")[0]}
+        </span>
+        <span className="flex items-center gap-1">
+          <Clock size={12} />
+          {mission.arrivalTime}
+        </span>
+        {showDistance && mission.distance && (
+          <span className="text-primary font-medium">{mission.distance} away</span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+        <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
+          <IndianRupee size={14} />
+          {mission.budgetMin}–{mission.budgetMax}
+        </div>
+        <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
+          {mission.category}
+        </span>
+      </div>
+    </motion.div>
+  );
+};
+
+export default MissionCard;
