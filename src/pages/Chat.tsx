@@ -1,34 +1,126 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Send, Phone } from "lucide-react";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { mockChatMessages } from "@/lib/mockData";
+
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { useApp } from "@/contexts/AppContext";
+
+interface ChatMessage {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: string;
+  isMe: boolean;
+}
 
 const Chat = () => {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  const { conversations } = useNotifications();
+  const { id: missionId } = useParams<{ id: string }>(); // Assuming Update route to use missionId
+  const { userProfile } = useApp();
+  // const { conversations } = useNotifications();
 
-  // Find the conversation matching the URL param
-  const conversation = conversations.find((c) => c.id === id);
-
-  const [messages, setMessages] = useState(mockChatMessages);
+  // In a real app, we'd fetch the mission/runner details here if we don't have them in context
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const participantName = conversation?.participantName || "Chat";
-  const participantAvatar =
-    conversation?.participantAvatar ||
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=default";
-  const missionTitle = conversation?.missionTitle;
+  const participantName = "Runner/Requester"; // To be fetched dynamically
+  const participantAvatar = "https://api.dicebear.com/7.x/avataaars/svg?seed=" + missionId;
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: `c${Date.now()}`, senderId: "u1", text: input, timestamp: "Now" },
-    ]);
-    setInput("");
+  // Fetch initial messages and subscribe
+  useEffect(() => {
+    if (!missionId || !userProfile) return;
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("mission_id", missionId)
+        .order("created_at", { ascending: true });
+
+      if (data) {
+        setMessages(data.map((m) => ({
+          id: m.id,
+          senderId: m.sender_id,
+          text: m.text,
+          timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: m.sender_id === userProfile.id
+        })));
+      }
+    };
+
+    fetchMessages();
+
+    // Subscribe to new messages
+    const channel = supabase
+      .channel(`chat:${missionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `mission_id=eq.${missionId}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as any;
+          const isMe = newMsg.sender_id === userProfile.id;
+          // Only add if not already added (optimistic update might duplicate)
+          setMessages((prev) => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, {
+              id: newMsg.id,
+              senderId: newMsg.sender_id,
+              text: newMsg.text,
+              timestamp: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              isMe
+            }];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [missionId, userProfile]);
+
+  // Scroll to bottom
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !userProfile || !missionId) return;
+
+    const text = input.trim();
+    setInput(""); // Clear input immediately
+
+    // Optimistic Update
+    // const optimisticId = "opt-" + Date.now();
+    // setMessages(prev => [...prev, {
+    //     id: optimisticId,
+    //     senderId: userProfile.id,
+    //     text: text,
+    //     timestamp: "Sending...",
+    //     isMe: true
+    // }]);
+
+    try {
+      await supabase.from("messages").insert({
+        mission_id: missionId,
+        sender_id: userProfile.id,
+        text: text
+      });
+      // The subscription will handle the UI update
+    } catch (error) {
+      console.error("Failed to send message", error);
+      // Remove optimistic message if failed
+    }
   };
 
   return (
@@ -45,10 +137,7 @@ const Chat = () => {
         />
         <div className="flex-1">
           <p className="font-semibold text-foreground text-sm">{participantName}</p>
-          {missionTitle && (
-            <p className="text-[10px] text-primary/80 font-medium truncate">📦 {missionTitle}</p>
-          )}
-          {!missionTitle && <p className="text-[10px] text-success">Online</p>}
+          <p className="text-[10px] text-success">Online</p>
         </div>
         <button className="p-2 rounded-full bg-card border border-border">
           <Phone size={16} className="text-muted-foreground" />
@@ -58,28 +147,28 @@ const Chat = () => {
       {/* Messages */}
       <div className="flex-1 px-5 py-4 space-y-3 overflow-y-auto">
         {messages.map((msg) => {
-          const isMe = msg.senderId === "u1";
           return (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+              className={`flex ${msg.isMe ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${isMe
-                    ? "bg-primary text-primary-foreground rounded-br-sm"
-                    : "bg-card border border-border text-foreground rounded-bl-sm"
+                className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm ${msg.isMe
+                  ? "bg-primary text-primary-foreground rounded-br-sm"
+                  : "bg-card border border-border text-foreground rounded-bl-sm"
                   }`}
               >
                 <p>{msg.text}</p>
-                <p className={`text-[10px] mt-1 ${isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                <p className={`text-[10px] mt-1 ${msg.isMe ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                   {msg.timestamp}
                 </p>
               </div>
             </motion.div>
           );
         })}
+        <div ref={scrollRef} />
       </div>
 
       {/* Input */}
@@ -94,7 +183,7 @@ const Chat = () => {
           />
           <button
             onClick={handleSend}
-            className="p-2.5 bg-gradient-primary rounded-full text-primary-foreground"
+            className="p-2.5 bg-gradient-primary rounded-full text-primary-foreground shadow-glow"
           >
             <Send size={16} />
           </button>

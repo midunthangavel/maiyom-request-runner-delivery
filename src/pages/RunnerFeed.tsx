@@ -1,9 +1,9 @@
 import PageShell from "@/components/PageShell";
 import MissionCard from "@/components/MissionCard";
 
-
 import { useApp } from "@/contexts/AppContext";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useMissions } from "@/hooks/useSupabase";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, SlidersHorizontal, Bell, X, AlertTriangle, IndianRupee, Sparkles } from "lucide-react";
@@ -20,7 +20,7 @@ const sortOptions = [
 ];
 
 const RunnerFeed = () => {
-  const { missions } = useApp();
+  const { data: missions = [], isLoading: loading } = useMissions();
   const { unreadAlerts } = useNotifications();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("All");
@@ -30,14 +30,8 @@ const RunnerFeed = () => {
   const [maxDistance, setMaxDistance] = useState(10);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [urgentOnly, setUrgentOnly] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  // Simulate initial load
-  useState(() => {
-    const timer = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(timer);
-  });
-
+  // Filter Logic (Client-side for now)
   let openMissions = missions
     .filter((m) => m.status === "open" || m.status === "offered")
     .filter((m) => activeCategory === "All" || m.category === activeCategory)
@@ -47,32 +41,29 @@ const RunnerFeed = () => {
       return (
         m.title.toLowerCase().includes(q) ||
         m.description.toLowerCase().includes(q) ||
-        m.deliveryLocation.toLowerCase().includes(q) ||
-        m.from.toLowerCase().includes(q) ||
-        m.to.toLowerCase().includes(q) ||
+        m.delivery_location.toLowerCase().includes(q) ||
+        m.from_location.toLowerCase().includes(q) ||
+        m.to_location.toLowerCase().includes(q) ||
         m.category.toLowerCase().includes(q)
       );
     })
     // Price range filter
-    .filter((m) => m.budgetMax >= priceRange[0] && m.budgetMin <= priceRange[1])
+    .filter((m) => m.budget_max >= priceRange[0] && m.budget_min <= priceRange[1])
     // Urgency filter
     .filter((m) => !urgentOnly || m.scenario === "urgent");
 
   // Apply sort
   if (sortBy === "price-high") {
-    openMissions = [...openMissions].sort((a, b) => b.budgetMax - a.budgetMax);
+    openMissions = [...openMissions].sort((a, b) => b.budget_max - a.budget_max);
   } else if (sortBy === "price-low") {
-    openMissions = [...openMissions].sort((a, b) => a.budgetMin - b.budgetMin);
+    openMissions = [...openMissions].sort((a, b) => a.budget_min - b.budget_min);
   } else if (sortBy === "smart") {
-    // Smart Match: prioritize urgent, then by proximity (distance field), then budget
+    // Smart Match: prioritize urgent
     openMissions = [...openMissions].sort((a, b) => {
       const urgencyA = a.scenario === "urgent" ? 0 : 1;
       const urgencyB = b.scenario === "urgent" ? 0 : 1;
       if (urgencyA !== urgencyB) return urgencyA - urgencyB;
-      const distA = parseFloat(a.distance?.replace(/[^\d.]/g, "") || "999");
-      const distB = parseFloat(b.distance?.replace(/[^\d.]/g, "") || "999");
-      if (Math.abs(distA - distB) > 1) return distA - distB;
-      return b.budgetMax - a.budgetMax;
+      return b.budget_max - a.budget_max;
     });
   }
 

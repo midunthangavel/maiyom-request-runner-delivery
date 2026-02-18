@@ -12,7 +12,7 @@ import {
 const Settings = () => {
     const navigate = useNavigate();
     const { theme, setTheme } = useTheme();
-    const { setAuthenticated } = useApp();
+    // const { setAuthenticated } = useApp();
     const { locale, setLocale, t } = useLanguage();
     const isDark = theme === "dark";
     const [showLangPicker, setShowLangPicker] = useState(false);

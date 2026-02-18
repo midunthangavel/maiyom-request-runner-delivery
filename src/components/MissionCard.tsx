@@ -1,7 +1,9 @@
 import { MapPin, Clock, IndianRupee } from "lucide-react";
-import { Mission, scenarioIcons, scenarioLabels } from "@/lib/mockData";
+import { Mission } from "@/types";
+import { scenarioIcons } from "@/lib/constants";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
 
 interface Props {
   mission: Mission;
@@ -42,7 +44,9 @@ const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: 
             </span>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">{mission.createdAt}</span>
+        <span className="text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(mission.created_at), { addSuffix: true })}
+        </span>
       </div>
 
       <h3 className="font-display font-semibold text-foreground mb-1">{mission.title}</h3>
@@ -54,11 +58,11 @@ const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: 
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <MapPin size={12} />
-          {mission.deliveryLocation.split(",")[0]}
+          {mission.delivery_location.split(",")[0]}
         </span>
         <span className="flex items-center gap-1">
           <Clock size={12} />
-          {mission.arrivalTime}
+          {mission.arrival_time}
         </span>
         {showDistance && mission.distance && (
           <span className="text-primary font-medium">{mission.distance} away</span>
@@ -68,7 +72,7 @@ const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: 
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
         <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
           <IndianRupee size={14} />
-          {mission.budgetMin}–{mission.budgetMax}
+          {mission.budget_min}–{mission.budget_max}
         </div>
         <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
           {mission.category}

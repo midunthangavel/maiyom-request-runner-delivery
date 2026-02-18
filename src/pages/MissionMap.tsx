@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "@/contexts/AppContext";
-import { ArrowLeft, Layers, Navigation, IndianRupee, Clock, MapPin } from "lucide-react";
+import { ArrowLeft, Navigation, IndianRupee, Clock, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { scenarioIcons } from "@/lib/mockData";
-import type { Mission } from "@/lib/mockData";
+import { scenarioIcons } from "@/lib/constants";
+import type { Mission } from "@/types";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useMissions } from "@/hooks/useSupabase";
+import { formatDistanceToNow } from "date-fns";
 
 const statusColors: Record<string, string> = {
     open: "bg-success/10 text-success border-success/20",
@@ -17,7 +18,7 @@ const statusColors: Record<string, string> = {
 
 const MissionMap = () => {
     const navigate = useNavigate();
-    const { missions } = useApp();
+    const { data: missions = [] } = useMissions();
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<L.Map | null>(null);
     const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
@@ -168,7 +169,7 @@ const MissionMap = () => {
                                 <div className="flex items-center gap-2">
                                     <span className="text-lg">{scenarioIcons[selectedMission.scenario]}</span>
                                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${statusColors[selectedMission.status] || ""}`}>
-                                        {selectedMission.status === "open" ? "Open" : selectedMission.status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                                        {selectedMission.status === "open" ? "Open" : selectedMission.status.replace("_", " ").replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                     </span>
                                     {selectedMission.scenario === "urgent" && (
                                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">
@@ -176,7 +177,7 @@ const MissionMap = () => {
                                         </span>
                                     )}
                                 </div>
-                                <span className="text-[10px] text-muted-foreground">{selectedMission.createdAt}</span>
+                                <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(selectedMission.created_at), { addSuffix: true })}</span>
                             </div>
 
                             <h3 className="font-display font-semibold text-foreground mb-1">{selectedMission.title}</h3>
@@ -186,16 +187,16 @@ const MissionMap = () => {
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                     <span className="flex items-center gap-1">
                                         <MapPin size={12} className="text-primary" />
-                                        {selectedMission.deliveryLocation.split(",")[0]}
+                                        {selectedMission.delivery_location.split(",")[0]}
                                     </span>
                                     <span className="flex items-center gap-1">
                                         <Clock size={12} />
-                                        {selectedMission.arrivalTime}
+                                        {selectedMission.arrival_time}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
                                     <IndianRupee size={14} className="text-primary" />
-                                    ₹{selectedMission.budgetMin}–{selectedMission.budgetMax}
+                                    ₹{selectedMission.budget_min}–{selectedMission.budget_max}
                                 </div>
                             </div>
 

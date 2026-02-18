@@ -1,11 +1,17 @@
 import PageShell from "@/components/PageShell";
 import { useApp } from "@/contexts/AppContext";
-import { mockRunners } from "@/lib/mockData";
 import { IndianRupee, Star, TrendingUp, Flame, Award, ChevronRight, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Earnings = () => {
-  const runner = mockRunners[0];
+  const { userProfile } = useApp();
+  // Placeholder runner stats until we have a real earnings table
+  const runner = {
+    earnings: { today: 0, weekly: 0 },
+    rating: userProfile?.rating || 5.0,
+    streak: 0,
+    completedMissions: userProfile?.completed_missions || 0
+  };
   const navigate = useNavigate();
 
   return (

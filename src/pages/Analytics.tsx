@@ -43,7 +43,7 @@ const performanceStats = [
     { label: "Growth", value: "+23%", icon: TrendingUp, color: "text-primary", bg: "bg-primary/10" },
 ];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
@@ -55,7 +55,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-const MissionTooltip = ({ active, payload, label }: any) => {
+const MissionTooltip = ({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">

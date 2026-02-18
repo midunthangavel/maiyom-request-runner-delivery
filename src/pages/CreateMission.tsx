@@ -3,13 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { ArrowLeft, Camera, MapPin, Clock, IndianRupee } from "lucide-react";
 import { motion } from "framer-motion";
-import { MissionScenario, scenarioIcons, scenarioLabels } from "@/lib/mockData";
+import { scenarioIcons, scenarioLabels } from "@/lib/constants";
+import { MissionScenario } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateMission } from "@/hooks/useSupabase";
 
 const CreateMission = () => {
   const navigate = useNavigate();
-  const { setMissions } = useApp();
+  // const { setMissions } = useApp(); // Removed mock state setter
+  const { userProfile } = useApp();
   const { toast } = useToast();
+  const createMission = useCreateMission();
+
   const [scenario, setScenario] = useState<MissionScenario>("traveling");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -20,29 +25,36 @@ const CreateMission = () => {
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title || !description || (scenario === "traveling" && !to)) return;
-    setMissions((prev) => [
-      {
-        id: `m${Date.now()}`,
-        requesterId: "u1",
+
+    if (!userProfile?.id) {
+      toast({ title: "Error", description: "You must be logged in to post a mission.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      await createMission.mutateAsync({
+        requester_id: userProfile.id,
         title,
         description,
         scenario,
-        from: from || "Current Location",
-        to,
-        deliveryLocation: deliveryLocation || to,
-        arrivalTime: arrivalTime || "ASAP",
-        budgetMin: Number(budgetMin) || 200,
-        budgetMax: Number(budgetMax) || 500,
+        from_location: from || "Current Location",
+        to_location: to,
+        delivery_location: deliveryLocation || to,
+        arrival_time: arrivalTime || "ASAP",
+        budget_min: Number(budgetMin) || 200,
+        budget_max: Number(budgetMax) || 500,
         status: "open",
         category: "General",
-        createdAt: "Just now",
-      },
-      ...prev,
-    ]);
-    toast({ title: "🎉 Mission posted!", description: "Runners can now see your mission" });
-    navigate("/missions");
+        // created_at is handled by default in DB
+      });
+      toast({ title: "🎉 Mission posted!", description: "Runners can now see your mission" });
+      navigate("/missions");
+    } catch (error) {
+      console.error("Error creating mission:", error);
+      toast({ title: "Error", description: "Failed to post mission. Please try again.", variant: "destructive" });
+    }
   };
 
   return (
@@ -82,7 +94,7 @@ const CreateMission = () => {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g., Flowers + Gift Box"
-            className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50 font-body"
+            className="w-full bg-card border-border border rounded-lg px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50 font-body"
           />
         </div>
 
@@ -178,10 +190,10 @@ const CreateMission = () => {
         {/* Submit */}
         <button
           onClick={handleSubmit}
-          disabled={!title || !description}
+          disabled={!title || !description || createMission.isPending}
           className="w-full py-3.5 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow disabled:opacity-40"
         >
-          Post Mission
+          {createMission.isPending ? "Posting..." : "Post Mission"}
         </button>
       </motion.div>
     </div>

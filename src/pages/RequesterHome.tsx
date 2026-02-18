@@ -1,19 +1,26 @@
 import PageShell from "@/components/PageShell";
-
-
 import MissionCard from "@/components/MissionCard";
 import OnboardingTour from "@/components/OnboardingTour";
 import { useApp } from "@/contexts/AppContext";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useMissions } from "@/hooks/useSupabase";
 import { motion } from "framer-motion";
 import { Plus, Bell, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const RequesterHome = () => {
-  const { userName, missions, walletBalance } = useApp();
+  const { userProfile } = useApp();
+  const { data: missions = [] } = useMissions();
   const { unreadAlerts } = useNotifications();
   const navigate = useNavigate();
-  const activeMissions = missions.filter((m) => m.requesterId === "u1" && m.status !== "delivered");
+
+  // Filter active missions for current user
+  // User ID should come from userProfile.id
+  const userId = userProfile?.id;
+  const activeMissions = missions.filter((m) => m.requester_id === userId && m.status !== "delivered");
+  const walletBalance = 0; // distinct wallet table needed or field in profile. Profile doesn't have it yet.
+
+  const userName = userProfile?.name || "User";
 
   return (
     <PageShell>
@@ -25,8 +32,6 @@ const RequesterHome = () => {
             <h1 className="text-xl font-display font-bold text-foreground">{userName.split(" ")[0]} 👋</h1>
           </div>
           <div className="flex items-center gap-2">
-
-
             <button
               onClick={() => navigate("/notifications")}
               className="relative p-2 rounded-full bg-card border border-border"
@@ -47,7 +52,7 @@ const RequesterHome = () => {
           className="flex items-center gap-2 text-xs text-muted-foreground mb-5 hover:text-primary transition-colors"
         >
           <MapPin size={12} className="text-primary" />
-          <span>Chennai, Tamil Nadu</span>
+          <span>{userProfile?.city || "Select Location"}</span>
         </button>
 
         {/* CTA Button */}

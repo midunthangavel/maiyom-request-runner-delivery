@@ -1,46 +1,26 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
-import { mockMissions, mockRunners, mockOffers, Mission, Runner, Offer } from "@/lib/mockData";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { UserProfile } from "@/types";
+import { Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 
-type UserRole = "requester" | "runner" | "both";
-type AuthMethod = "phone" | "google" | "apple" | null;
-
-interface UserProfile {
-  name: string;
-  dob: string;
-  city: string;
-  location: string;
-  aadhaar: string;
-  pan: string;
-}
+type AuthMethod = "email" | "google" | "apple" | null;
 
 interface AppState {
   isAuthenticated: boolean;
-  authMethod: AuthMethod;
-  currentRole: UserRole;
-  userId: string;
-  userName: string;
-  userProfile: UserProfile;
-  missions: Mission[];
-  runners: Runner[];
-  offers: Offer[];
-  walletBalance: number;
-  setAuthenticated: (v: boolean) => void;
-  setAuthMethod: (m: AuthMethod) => void;
-  setCurrentRole: (r: UserRole) => void;
-  setUserName: (n: string) => void;
-  setUserProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
-  setMissions: React.Dispatch<React.SetStateAction<Mission[]>>;
-  setOffers: React.Dispatch<React.SetStateAction<Offer[]>>;
-}
+  session: Session | null;
+  userProfile: UserProfile | null;
+  isLoading: boolean;
 
-const defaultProfile: UserProfile = {
-  name: "",
-  dob: "",
-  city: "",
-  location: "",
-  aadhaar: "",
-  pan: "",
-};
+  // Actions
+  logout: () => Promise<void>;
+
+  // Legacy / Helper fields for compatibility during refactor
+  currentRole: "requester" | "runner";
+  setCurrentRole: (r: "requester" | "runner") => void;
+  userId: string | undefined;
+  userName: string;
+}
 
 const AppContext = createContext<AppState | null>(null);
 
@@ -51,34 +31,77 @@ export const useApp = () => {
 };
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [isAuthenticated, setAuthenticated] = useState(false);
-  const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
-  const [currentRole, setCurrentRole] = useState<UserRole>("requester");
-  const [userName, setUserName] = useState("Rahul Kumar");
-  const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
-  const [missions, setMissions] = useState<Mission[]>(mockMissions);
-  const [offers, setOffers] = useState<Offer[]>(mockOffers);
+  const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentRole, setCurrentRole] = useState<"requester" | "runner">("requester");
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchProfile(session.user.id);
+      else setIsLoading(false);
+    });
+
+    // 2. Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+        setIsLoading(false);
+        queryClient.clear();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+      } else {
+        setUserProfile(data as UserProfile);
+        // Default role based on profile if available, else keep default
+        if (data.role && data.role !== "both") {
+          setCurrentRole(data.role as "requester" | "runner");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
 
   return (
     <AppContext.Provider
       value={{
-        isAuthenticated,
-        authMethod,
-        currentRole,
-        userId: "u1",
-        userName,
+        isAuthenticated: !!session,
+        session,
         userProfile,
-        missions,
-        runners: mockRunners,
-        offers,
-        walletBalance: 2450,
-        setAuthenticated,
-        setAuthMethod,
+        isLoading,
+        logout,
+        currentRole,
         setCurrentRole,
-        setUserName,
-        setUserProfile,
-        setMissions,
-        setOffers,
+        userId: session?.user.id,
+        userName: userProfile?.name || "User",
       }}
     >
       {children}

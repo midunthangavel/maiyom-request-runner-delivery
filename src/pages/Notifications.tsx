@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { notificationIcons } from "@/lib/mockData";
+import { notificationIcons } from "@/lib/constants";
 import { motion } from "framer-motion";
 import { ArrowLeft, CheckCheck, Bell } from "lucide-react";
 
@@ -55,8 +55,8 @@ const Notifications = () => {
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => handleAlertTap(notif.id, notif.actionUrl)}
                                 className={`w-full text-left flex items-start gap-3 p-3.5 rounded-xl border transition-all ${notif.read
-                                        ? "bg-card border-border"
-                                        : "bg-secondary/50 border-primary/20 shadow-sm"
+                                    ? "bg-card border-border"
+                                    : "bg-secondary/50 border-primary/20 shadow-sm"
                                     }`}
                             >
                                 {/* Icon */}
@@ -75,7 +75,7 @@ const Notifications = () => {
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{notif.body}</p>
-                                    <p className="text-[10px] text-muted-foreground/70 mt-1">{notif.timestamp}</p>
+                                    <p className="text-[10px] text-muted-foreground/70 mt-1">{notif.createdAt}</p>
                                 </div>
                             </motion.button>
                         ))}

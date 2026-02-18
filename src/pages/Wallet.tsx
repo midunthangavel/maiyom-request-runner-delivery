@@ -10,7 +10,8 @@ const transactions = [
 ];
 
 const Wallet = () => {
-  const { walletBalance } = useApp();
+  // const { walletBalance } = useApp();
+  const walletBalance = 0;
 
   return (
     <PageShell>

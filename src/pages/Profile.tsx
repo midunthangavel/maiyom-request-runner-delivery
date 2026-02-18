@@ -7,32 +7,48 @@ import {
   Moon, Sun, Wallet, TrendingUp, Flame, Package, Zap, Award, MessageCircle
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { mockRunners } from "@/lib/mockData";
+
 import { getReviewsForRunner, getTrustScore, getAverageRating, type Review } from "@/lib/reviewStore";
 import { useState, useEffect } from "react";
+import { useMissions } from "@/hooks/useSupabase"; // To count missions
 
 const Profile = () => {
-  const { userName, currentRole, walletBalance, missions, setAuthenticated } = useApp();
+  const { userName, currentRole, logout, userProfile } = useApp();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
 
+  const { data: missions = [] } = useMissions();
+
   const isRunner = currentRole === "runner";
-  const runner = mockRunners[0];
-  const myMissions = missions.filter((m) => m.requesterId === "u1");
+
+  // Use real profile data or fallbacks
+  const runnerStats = {
+    rating: userProfile?.rating || 5.0,
+    completedMissions: userProfile?.completed_missions || 0,
+    verificationLevel: userProfile?.verification_level || 1,
+    streak: 0, // Not yet in DB
+    earnings: { today: 0, weekly: 0 } // Not yet in DB
+  };
+
+  // Placeholder wallet balance
+  const walletBalance = 0;
+
+  const myMissions = missions.filter((m) => m.requester_id === userProfile?.id);
   const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
-    if (isRunner) {
-      setReviews(getReviewsForRunner("r1"));
+    if (isRunner && userProfile?.id) {
+      // TODO: Fetch real reviews
+      setReviews(getReviewsForRunner("r1")); // Keep mock reviews for now as we haven't migrated reviews table
     }
-  }, [isRunner]);
+  }, [isRunner, userProfile?.id]);
 
-  const avgRating = isRunner ? (getAverageRating("r1") ?? runner.rating) : 4.7;
-  const trustBadge = isRunner ? getTrustScore(avgRating, runner.completedMissions) : null;
+  const avgRating = isRunner ? (runnerStats.rating) : 4.7; // Default requester rating
+  const trustBadge = isRunner ? getTrustScore(avgRating, runnerStats.completedMissions) : null;
 
-  const handleLogout = () => {
-    setAuthenticated(false);
+  const handleLogout = async () => {
+    await logout();
     navigate("/");
   };
 
@@ -41,11 +57,15 @@ const Profile = () => {
       <div className="px-5 pt-6">
         {/* Profile Card */}
         <div className="bg-card rounded-xl border border-border p-5 shadow-card text-center mb-5">
-          <div className="w-20 h-20 rounded-full bg-gradient-primary mx-auto mb-3 flex items-center justify-center text-3xl">
-            {isRunner ? "🏃" : "🧑"}
+          <div className="w-20 h-20 rounded-full bg-gradient-primary mx-auto mb-3 flex items-center justify-center text-3xl overflow-hidden">
+            {userProfile?.avatar_url ? (
+              <img src={userProfile.avatar_url} alt={userName} className="w-full h-full object-cover" />
+            ) : (
+              isRunner ? "🏃" : "🧑"
+            )}
           </div>
           <h2 className="text-lg font-display font-bold text-foreground">{userName}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Chennai, Tamil Nadu</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{userProfile?.city || "Chennai, Tamil Nadu"}</p>
           <div className="mt-2 flex justify-center">
             <RoleSwitcher />
           </div>
@@ -55,13 +75,13 @@ const Profile = () => {
             {isRunner ? (
               <>
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Star size={12} className="text-warning fill-warning" /> {runner.rating}
+                  <Star size={12} className="text-warning fill-warning" /> {runnerStats.rating}
                 </span>
                 <span className="text-xs text-muted-foreground">•</span>
-                <span className="text-xs text-muted-foreground">{runner.completedMissions} deliveries</span>
+                <span className="text-xs text-muted-foreground">{runnerStats.completedMissions} deliveries</span>
                 <span className="text-xs text-muted-foreground">•</span>
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Flame size={12} className="text-primary" /> {runner.streak} day streak
+                  <Flame size={12} className="text-primary" /> {runnerStats.streak} day streak
                 </span>
               </>
             ) : (
@@ -75,7 +95,7 @@ const Profile = () => {
             )}
             <span className="text-xs text-muted-foreground">•</span>
             <span className="flex items-center gap-1 text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
-              <Shield size={10} /> Level {isRunner ? runner.verificationLevel : 2}
+              <Shield size={10} /> Level {isRunner ? runnerStats.verificationLevel : 2}
             </span>
           </div>
           {/* Trust Score Badge */}
@@ -94,11 +114,11 @@ const Profile = () => {
           <div className="grid grid-cols-2 gap-3 mb-5">
             <div className="bg-card rounded-lg border border-border p-3 shadow-card">
               <p className="text-[10px] text-muted-foreground">Today</p>
-              <p className="text-lg font-display font-bold text-foreground">₹{runner.earnings.today}</p>
+              <p className="text-lg font-display font-bold text-foreground">₹{runnerStats.earnings.today}</p>
             </div>
             <div className="bg-card rounded-lg border border-border p-3 shadow-card">
               <p className="text-[10px] text-muted-foreground">This Week</p>
-              <p className="text-lg font-display font-bold text-foreground">₹{runner.earnings.weekly.toLocaleString()}</p>
+              <p className="text-lg font-display font-bold text-foreground">₹{runnerStats.earnings.weekly.toLocaleString()}</p>
             </div>
           </div>
         )}
