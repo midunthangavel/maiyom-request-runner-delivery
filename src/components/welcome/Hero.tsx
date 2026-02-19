@@ -90,6 +90,17 @@ export default function Hero() {
                     </p>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <button className="btn-primary-welcome flex items-center gap-2 group">
+                            <a href="https://maiyom.vercel.app/welcome">Try Now</a>
+                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </div>
+
+                    <p className="max-w-2xl mx-auto text-lg md:text-xl text-[var(--text-secondary)] mb-10">
+                        Business Social networking App
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <button onClick={() => navigate("/onboarding")} className="btn-primary-welcome flex items-center gap-2 group">
                             Try App Now
                             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -99,6 +110,8 @@ export default function Hero() {
                             Learn More
                         </a>
                     </div>
+
+
                 </motion.div>
 
                 {/* Hero Visual Mockup */}
