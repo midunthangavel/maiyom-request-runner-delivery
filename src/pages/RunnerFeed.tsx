@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FeedSkeleton } from "@/components/Skeletons";
 import EmptyState from "@/components/EmptyState";
 
-const categories = ["All", "Medicine", "Food", "Gifts", "Electronics", "Documents"];
+const categories = ["All", "General", "Medicine", "Food", "Gifts", "Electronics", "Documents"];
 const sortOptions = [
   { value: "newest", label: "Newest First", icon: null },
   { value: "smart", label: "Smart Match", icon: Sparkles },
@@ -21,6 +21,7 @@ const sortOptions = [
 
 const RunnerFeed = () => {
   const { data: missions = [], isLoading: loading } = useMissions();
+  console.log("RunnerFeed Missions:", missions);
   const { unreadAlerts } = useNotifications();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("All");

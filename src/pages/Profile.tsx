@@ -4,7 +4,7 @@ import RoleSwitcher from "@/components/RoleSwitcher";
 import { useTheme } from "next-themes";
 import {
   Star, Shield, MapPin, ChevronRight, LogOut, Settings,
-  Moon, Sun, Wallet, TrendingUp, Flame, Package, Zap, Award, MessageCircle
+  Moon, Sun, Wallet, TrendingUp, Flame, Package, Zap, Award, MessageCircle, User
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -64,7 +64,8 @@ const Profile = () => {
               isRunner ? "🏃" : "🧑"
             )}
           </div>
-          <h2 className="text-lg font-display font-bold text-foreground">{userName}</h2>
+          <h2 className="text-lg font-display font-bold text-foreground">{userProfile?.name || userName}</h2>
+          {userProfile?.username && <p className="text-sm text-primary font-medium">@{userProfile.username}</p>}
           <p className="text-xs text-muted-foreground mt-0.5">{userProfile?.city || "Chennai, Tamil Nadu"}</p>
           <div className="mt-2 flex justify-center">
             <RoleSwitcher />
@@ -144,17 +145,51 @@ const Profile = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-foreground">Verification</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Complete Aadhaar KYC to reach Level 3</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {userProfile?.aadhaar_verified ? "Aadhaar KYC Verified" : "Complete Aadhaar KYC to reach Level 3"}
+              </p>
             </div>
             <button
               onClick={() => navigate("/verification")}
-              className="text-xs font-medium bg-primary text-primary-foreground px-3 py-1.5 rounded-full"
+              className={`text-xs font-medium px-3 py-1.5 rounded-full ${userProfile?.aadhaar_verified ? "bg-green-500 text-white" : "bg-primary text-primary-foreground"}`}
             >
-              Verify
+              {userProfile?.aadhaar_verified ? "Verified" : "Verify"}
             </button>
           </div>
-          <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className="h-full w-2/3 bg-gradient-primary rounded-full" />
+          {!userProfile?.aadhaar_verified && (
+            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full w-2/3 bg-gradient-primary rounded-full" />
+            </div>
+          )}
+        </div>
+
+        {/* Personal Details */}
+        <div className="bg-card rounded-lg border border-border p-4 mb-5 shadow-card space-y-3">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <User size={16} className="text-primary" /> Personal Details
+          </h3>
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div>
+              <p className="text-muted-foreground">Date of Birth</p>
+              <p className="font-medium text-foreground">{userProfile?.dob ? new Date(userProfile.dob).toLocaleDateString() : "Not set"}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Phone</p>
+              <p className="font-medium text-foreground">{userProfile?.phone || "Not linked"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-muted-foreground">Address</p>
+              <p className="font-medium text-foreground">{userProfile?.address || "No address set"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-muted-foreground">Identity (Aadhaar/PAN)</p>
+              <p className="font-medium text-foreground">
+                {userProfile?.aadhaar_number ? `Aadhaar: ${userProfile.aadhaar_number}` : "Aadhaar: Not provided"}
+              </p>
+              <p className="font-medium text-foreground mt-1">
+                {userProfile?.pan_number ? `PAN: ${userProfile.pan_number}` : "PAN: Not provided"}
+              </p>
+            </div>
           </div>
         </div>
 

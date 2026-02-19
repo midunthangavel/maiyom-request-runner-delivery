@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
-import { ArrowLeft, Camera, MapPin, Clock, IndianRupee } from "lucide-react";
+import { ArrowLeft, Camera, MapPin, Clock, IndianRupee, Hash } from "lucide-react";
 import { motion } from "framer-motion";
-import { scenarioIcons, scenarioLabels } from "@/lib/constants";
+import { scenarioIcons, scenarioLabels, CITY_COORDS } from "@/lib/constants";
 import { MissionScenario } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateMission } from "@/hooks/useSupabase";
@@ -24,6 +24,7 @@ const CreateMission = () => {
   const [arrivalTime, setArrivalTime] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
+  const [category, setCategory] = useState("General");
 
   const handleSubmit = async () => {
     if (!title || !description || (scenario === "traveling" && !to)) return;
@@ -34,6 +35,21 @@ const CreateMission = () => {
     }
 
     try {
+      // Basic Mock Geocoding
+      let lat = null;
+      let lng = null;
+      let city = to || deliveryLocation; // try to find city in 'to' or 'deliveryLocation'
+
+      // Simple check if any key in CITY_COORDS is present in the string
+      const foundCity = Object.keys(CITY_COORDS).find(c => city.toLowerCase().includes(c.toLowerCase()));
+
+      if (foundCity) {
+        const [baseLat, baseLng] = CITY_COORDS[foundCity];
+        // Add small random offset to avoid stacking (approx 500m-1km radius)
+        lat = baseLat + (Math.random() - 0.5) * 0.02;
+        lng = baseLng + (Math.random() - 0.5) * 0.02;
+      }
+
       await createMission.mutateAsync({
         requester_id: userProfile.id,
         title,
@@ -46,7 +62,9 @@ const CreateMission = () => {
         budget_min: Number(budgetMin) || 200,
         budget_max: Number(budgetMax) || 500,
         status: "open",
-        category: "General",
+        category: category,
+        lat,
+        lng,
         // created_at is handled by default in DB
       });
       toast({ title: "🎉 Mission posted!", description: "Runners can now see your mission" });
@@ -108,6 +126,27 @@ const CreateMission = () => {
             placeholder="Describe exactly what you need..."
             className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary resize-none placeholder:text-muted-foreground/50 font-body"
           />
+        </div>
+
+        {/* Category */}
+        <div>
+          <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1">
+            <Hash size={12} /> Category
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {["General", "Medicine", "Food", "Gifts", "Electronics", "Documents"].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all ${category === cat
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-muted-foreground border-border"
+                  }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Photo */}

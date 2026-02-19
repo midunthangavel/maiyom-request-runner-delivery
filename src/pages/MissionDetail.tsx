@@ -213,18 +213,47 @@ const MissionDetail = () => {
           </div>
         )}
 
-        {/* Runner: Submit Offer */}
-        {!isRequester && mission.status === "open" && (
-          <button
-            onClick={() => navigate(`/submit-offer/${mission.id}`)}
-            className="w-full py-3.5 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow"
-          >
-            Submit Offer
-          </button>
+        {/* Runner: Actions */}
+        {!isRequester && (
+          <div className="space-y-3">
+            {/* If I have a pending offer */}
+            {missionOffers.find(o => o.runner_id === userProfile?.id && o.status === "pending") && (
+              <div className="bg-secondary/20 border border-secondary text-secondary-foreground p-3 rounded-lg text-center text-sm font-medium">
+                Offer Submitted. Waiting for Requester.
+              </div>
+            )}
+
+            {/* If I have an accepted offer */}
+            {missionOffers.find(o => o.runner_id === userProfile?.id && o.status === "accepted") && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate("/tracking/" + mission.id)}
+                  className="flex-1 py-3.5 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow flex items-center justify-center gap-2"
+                >
+                  <Navigation size={16} /> Start / Track
+                </button>
+                <button
+                  onClick={() => navigate(`/chat/${mission.id}`)}
+                  className="flex-1 py-3.5 rounded-lg border border-border bg-card text-foreground font-semibold text-sm flex items-center justify-center gap-2"
+                >
+                  <MessageSquare size={16} /> Chat
+                </button>
+              </div>
+            )}
+
+            {/* If open and no offer from me */}
+            {mission.status === "open" && !missionOffers.find(o => o.runner_id === userProfile?.id) && (
+              <button
+                onClick={() => navigate(`/submit-offer/${mission.id}`)}
+                className="w-full py-3.5 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow"
+              >
+                Submit Offer
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
   );
 };
-
 export default MissionDetail;

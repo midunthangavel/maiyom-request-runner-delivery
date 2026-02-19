@@ -52,6 +52,24 @@ export const useCreateMission = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["missions"] });
         },
+        // ... (existing useCreateMission)
+    });
+};
+
+export const useMyMissions = (requesterId: string) => {
+    return useQuery({
+        queryKey: ["missions", "requester", requesterId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("missions")
+                .select("*")
+                .eq("requester_id", requesterId)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            return data as Mission[];
+        },
+        enabled: !!requesterId,
     });
 };
 
@@ -76,6 +94,27 @@ export const useOffers = (missionId: string) => {
             return data as (Offer & { runner: UserProfile })[];
         },
         enabled: !!missionId,
+        // ... (closing brace of useOffers)
+    });
+};
+
+export const useMyOffers = (runnerId: string) => {
+    return useQuery({
+        queryKey: ["offers", "runner", runnerId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("offers")
+                .select(`
+                    *,
+                    mission:mission_id (*)
+                `)
+                .eq("runner_id", runnerId)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            return data as (Offer & { mission: Mission })[];
+        },
+        enabled: !!runnerId,
     });
 };
 

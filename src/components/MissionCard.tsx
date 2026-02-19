@@ -1,4 +1,4 @@
-import { MapPin, Clock, IndianRupee } from "lucide-react";
+import { MapPin, Clock, IndianRupee, MessageCircle } from "lucide-react";
 import { Mission } from "@/types";
 import { scenarioIcons } from "@/lib/constants";
 import { motion } from "framer-motion";
@@ -74,9 +74,23 @@ const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: 
           <IndianRupee size={14} />
           {mission.budget_min}–{mission.budget_max}
         </div>
-        <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
-          {mission.category}
-        </span>
+        <div className="flex items-center gap-2">
+          {["accepted", "in_transit", "delivered"].includes(mission.status) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/chat/${mission.id}`);
+              }}
+              className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+              title="Chat"
+            >
+              <MessageCircle size={16} />
+            </button>
+          )}
+          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">
+            {mission.category}
+          </span>
+        </div>
       </div>
     </motion.div>
   );

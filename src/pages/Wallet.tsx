@@ -2,16 +2,11 @@ import PageShell from "@/components/PageShell";
 import { useApp } from "@/contexts/AppContext";
 import { IndianRupee, ArrowUpRight, ArrowDownLeft, Plus } from "lucide-react";
 
-const transactions = [
-  { id: 1, label: "Mission: Flowers + Gift Box", amount: -750, type: "debit", time: "Today, 6:15 PM" },
-  { id: 2, label: "Wallet Top-up", amount: 2000, type: "credit", time: "Yesterday" },
-  { id: 3, label: "Mission: Phone Charger", amount: -450, type: "debit", time: "2 days ago" },
-  { id: 4, label: "Refund: Cancelled Mission", amount: 350, type: "credit", time: "3 days ago" },
-];
+const transactions: { id: number; label: string; amount: number; type: "credit" | "debit"; time: string }[] = [];
 
 const Wallet = () => {
-  // const { walletBalance } = useApp();
-  const walletBalance = 0;
+  const { userProfile } = useApp();
+  const walletBalance = userProfile?.wallet_balance || 0;
 
   return (
     <PageShell>

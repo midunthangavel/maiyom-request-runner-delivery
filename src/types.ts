@@ -89,11 +89,19 @@ export interface UserProfile {
     role: "requester" | "runner" | "both";
     city?: string;
     location?: string;
+    // New Onboarding Fields
+    username?: string;
+    address?: string;
     dob?: string;
+    aadhaar_number?: string;
+    pan_number?: string;
+
     aadhaar_verified: boolean;
     rating?: number;
     completed_missions?: number;
     verification_level?: number;
+    wallet_balance?: number;
+    saved_locations?: any[]; // Using any[] for jsonb, can be typed more specifically later
     created_at: string;
 }
 

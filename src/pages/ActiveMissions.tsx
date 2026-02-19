@@ -5,10 +5,13 @@ import { useNavigate } from "react-router-dom";
 import EmptyState from "@/components/EmptyState";
 import { motion } from "framer-motion";
 
+import { useMyMissions } from "@/hooks/useSupabase";
+
 const ActiveMissions = () => {
-  const { missions } = useApp();
+  const { userId } = useApp();
+  const { data: myMissions = [], isLoading } = useMyMissions(userId || "");
   const navigate = useNavigate();
-  const myMissions = missions.filter((m) => m.requesterId === "u1");
+  // const myMissions = missions.filter((m) => m.requesterId === "u1"); // specific logic removed
 
   return (
     <PageShell>

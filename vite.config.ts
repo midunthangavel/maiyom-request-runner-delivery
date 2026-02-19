@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     hmr: {
-      overlay: false,
+      clientPort: 8080,
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

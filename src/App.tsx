@@ -38,9 +38,23 @@ import Welcome from "./pages/Welcome";
 
 const queryClient = new QueryClient();
 
+import { useLocation } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+
 const AuthGate = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useApp();
-  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  const { isAuthenticated, isLoading } = useApp();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return <Navigate to="/auth" state={{ from: location }} replace />;
+
   return <>{children}</>;
 };
 
