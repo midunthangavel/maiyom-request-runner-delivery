@@ -1,4 +1,4 @@
-import { MapPin, Clock, IndianRupee, MessageCircle } from "lucide-react";
+import { MapPin, Clock, IndianRupee, MessageCircle, Sparkles } from "lucide-react";
 import { Mission } from "@/types";
 import { scenarioIcons } from "@/lib/constants";
 import { motion } from "framer-motion";
@@ -25,12 +25,13 @@ const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.08, duration: 0.35, ease: "easeOut" }}
-      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: "spring", bounce: 0.4, duration: 0.8, delay: index * 0.1 }}
+      whileTap={{ scale: 0.96 }}
       onClick={() => navigate(`/mission/${mission.id}`)}
-      className="bg-card rounded-lg border border-border p-4 shadow-card cursor-pointer hover:shadow-elevated transition-shadow"
+      className={`bg-card rounded-2xl border p-4 shadow-elevated cursor-pointer hover-lift neumorphic-card ${mission.is_boosted ? "border-yellow-500/50 ring-1 ring-yellow-500/20 bg-yellow-500/5" : "border-border/50"
+        }`}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -49,7 +50,10 @@ const MissionCard = ({ mission, showDistance, variant = "default", index = 0 }: 
         </span>
       </div>
 
-      <h3 className="font-display font-semibold text-foreground mb-1">{mission.title}</h3>
+      <h3 className="font-display font-semibold text-foreground mb-1 flex items-center gap-2">
+        {mission.is_boosted && <Sparkles size={14} className="text-yellow-500 fill-yellow-500 shrink-0" />}
+        {mission.title}
+      </h3>
 
       {variant === "default" && (
         <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{mission.description}</p>

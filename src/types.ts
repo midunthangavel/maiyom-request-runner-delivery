@@ -1,6 +1,6 @@
 export type MissionScenario = "traveling" | "event" | "urgent";
-export type MissionStatus = "open" | "offered" | "accepted" | "in_transit" | "delivered";
-export type OfferStatus = "pending" | "accepted" | "rejected";
+export type MissionStatus = "open" | "offered" | "accepted" | "in_transit" | "delivered" | "disputed";
+export type OfferStatus = "pending" | "accepted" | "rejected" | "countered";
 
 export interface Mission {
     id: string;
@@ -21,6 +21,18 @@ export interface Mission {
     image_url?: string;
     lat?: number;
     lng?: number;
+    pickup_otp?: string;
+    delivery_otp?: string;
+    pickup_photo_url?: string;
+    delivery_photo_url?: string;
+    is_scheduled?: boolean;
+    scheduled_for?: string;
+    dropoff_locations?: string[];
+    is_template?: boolean;
+    vehicle_requirement?: 'Any' | 'Two-Wheeler' | 'Car' | 'Truck';
+    package_size?: 'Small' | 'Medium' | 'Large';
+    is_boosted?: boolean;
+    additional_costs?: { amount: number; description: string; photo_url?: string }[];
 }
 
 // Keeping original camelCase aliases for easier refactoring if we transform data
@@ -60,6 +72,7 @@ export interface Offer {
     mission_id: string;
     runner_id: string;
     price: number;
+    counter_price?: number;
     note: string;
     item_photo_url?: string;
     status: OfferStatus;
@@ -77,6 +90,10 @@ export interface ChatMessage {
     id: string;
     sender_id: string;
     text: string;
+    type?: 'text' | 'image' | 'file' | 'audio';
+    file_url?: string;
+    file_name?: string;
+    audio_url?: string;
     created_at: string;
 }
 
@@ -102,18 +119,23 @@ export interface UserProfile {
     verification_level?: number;
     wallet_balance?: number;
     saved_locations?: any[]; // Using any[] for jsonb, can be typed more specifically later
+    tier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+    favorite_runners?: string[]; // Array of runner profile IDs
     created_at: string;
 }
 
 export interface Conversation {
-    id: string; // usually mission_id
+    id: string; // usually mission_id or group_id
     participantName: string;
     participantAvatar?: string;
     lastMessage: string;
     time: string;
     unreadCount: number;
     missionTitle?: string;
-    status: "active" | "completed";
+    status: "active" | "completed" | "group";
+    isGroup?: boolean;
+    groupName?: string;
+    members?: string[];
 }
 
 export interface AppNotification {
@@ -127,4 +149,25 @@ export interface AppNotification {
     actionUrl?: string; // or action_url
     // For compatibility with Supabase 'created_at'
     createdAt?: string;
+}
+
+export interface Review {
+    id: string;
+    runner_id: string;
+    requester_id: string;
+    mission_id: string;
+    rating: number;
+    tags: string[];
+    comment: string;
+    created_at: string;
+}
+
+export interface Transaction {
+    id: string;
+    user_id: string;
+    amount: number;
+    type: "credit" | "debit";
+    label: string;
+    mission_id?: string;
+    created_at: string;
 }

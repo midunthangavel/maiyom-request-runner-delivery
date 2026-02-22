@@ -87,6 +87,18 @@ const Auth = () => {
 
 
   const handleCompleteProfile = async () => {
+    // Validate Aadhaar format (12 digits) if provided
+    if (aadhaar && !/^\d{12}$/.test(aadhaar.replace(/\s/g, ""))) {
+      toast({ variant: "destructive", title: "Invalid Aadhaar", description: "Aadhaar number must be exactly 12 digits." });
+      return;
+    }
+
+    // Validate PAN format (ABCDE1234F) if provided
+    if (pan && !/^[A-Z]{5}\d{4}[A-Z]$/.test(pan.toUpperCase())) {
+      toast({ variant: "destructive", title: "Invalid PAN", description: "PAN must be in format: ABCDE1234F (5 letters, 4 digits, 1 letter)." });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -101,8 +113,8 @@ const Auth = () => {
         city,
         address,
         dob: dob ? new Date(dob).toISOString().split('T')[0] : null,
-        aadhaar_number: aadhaar,
-        pan_number: pan,
+        aadhaar_number: aadhaar ? aadhaar.replace(/\s/g, "") : null,
+        pan_number: pan ? pan.toUpperCase() : null,
         avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username || fullName}`,
         aadhaar_verified: false, // Default
       });

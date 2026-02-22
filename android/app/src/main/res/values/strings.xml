@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Maiyom</string>
+    <string name="title_activity_main">Maiyom</string>
+    <string name="package_name">com.maiyom.missions</string>
+    <string name="custom_url_scheme">com.maiyom.missions</string>
+</resources>

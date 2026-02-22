@@ -4,7 +4,7 @@ import RoleSwitcher from "@/components/RoleSwitcher";
 import { useTheme } from "next-themes";
 import {
   Star, Shield, MapPin, ChevronRight, LogOut, Settings,
-  Moon, Sun, Wallet, TrendingUp, Flame, Package, Zap, Award, MessageCircle, User
+  Moon, Sun, Wallet, TrendingUp, Flame, Package, Zap, Award, MessageCircle, User, HelpCircle, Trophy, Target, Gift, Map
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -22,10 +22,50 @@ const Profile = () => {
 
   const isRunner = currentRole === "runner";
 
+  // Real backend completed missions if available, otherwise mock 0
+  const completedMissionsCount = userProfile?.completed_missions || 0;
+
+  // Calculate Tier Based on Completed Missions
+  let currentTier = "Bronze";
+  let nextTier = "Silver";
+  let missionsForNextTier = 10;
+  let progressToNext = 0;
+
+  if (completedMissionsCount >= 100) {
+    currentTier = "Platinum";
+    nextTier = "Max Level";
+    missionsForNextTier = 100; // Cap
+    progressToNext = 100;
+  } else if (completedMissionsCount >= 50) {
+    currentTier = "Gold";
+    nextTier = "Platinum";
+    missionsForNextTier = 100;
+    progressToNext = ((completedMissionsCount - 50) / 50) * 100;
+  } else if (completedMissionsCount >= 10) {
+    currentTier = "Silver";
+    nextTier = "Gold";
+    missionsForNextTier = 50;
+    progressToNext = ((completedMissionsCount - 10) / 40) * 100;
+  } else {
+    currentTier = "Bronze";
+    nextTier = "Silver";
+    missionsForNextTier = 10;
+    progressToNext = (completedMissionsCount / 10) * 100;
+  }
+
+  const tierColors: Record<string, string> = {
+    "Bronze": "text-orange-700 bg-orange-700/10 border-orange-700/20",
+    "Silver": "text-slate-400 bg-slate-400/10 border-slate-400/20",
+    "Gold": "text-yellow-500 bg-yellow-500/10 border-yellow-500/20",
+    "Platinum": "text-cyan-400 bg-cyan-400/10 border-cyan-400/20 shadow-[0_0_10px_rgba(34,211,238,0.5)]",
+  };
+
+  const activeTierColor = tierColors[currentTier];
+
   // Use real profile data or fallbacks
   const runnerStats = {
     rating: userProfile?.rating || 5.0,
-    completedMissions: userProfile?.completed_missions || 0,
+    completedMissions: completedMissionsCount,
     verificationLevel: userProfile?.verification_level || 1,
     streak: 0, // Not yet in DB
     earnings: { today: 0, weekly: 0 } // Not yet in DB
@@ -109,6 +149,40 @@ const Profile = () => {
             </div>
           )}
         </div>
+
+        {/* Runner Tier Gamification */}
+        {isRunner && (
+          <div className="bg-card rounded-xl border border-border p-5 shadow-card mb-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Trophy size={12} className="text-primary" /> Current Tier
+                </p>
+                <div className={`inline-flex flex-col items-start px-2.5 py-1 rounded-md border ${activeTierColor}`}>
+                  <span className="font-display font-bold text-lg">{currentTier} Runner</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1 flex items-center justify-end gap-1">
+                  <Target size={12} /> Next: {nextTier}
+                </p>
+                <p className="font-semibold text-lg text-foreground">
+                  {completedMissionsCount} <span className="text-muted-foreground text-sm font-normal">/ {missionsForNextTier}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="relative h-2.5 w-full bg-muted rounded-full overflow-hidden mb-2">
+              <div
+                className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 ease-out bg-primary`}
+                style={{ width: `${progressToNext}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center">Complete {missionsForNextTier - completedMissionsCount} more missions to unlock {nextTier} perks!</p>
+          </div>
+        )}
 
         {/* Runner: Earnings Quick Stats */}
         {isRunner && (
@@ -245,6 +319,26 @@ const Profile = () => {
               <ChevronRight size={16} className="text-muted-foreground" />
             </button>
           )}
+
+          {isRunner && (
+            <button
+              onClick={() => navigate("/runner-map")}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+            >
+              <Map size={18} className="text-destructive" />
+              <span className="flex-1 text-sm text-foreground text-left">Live Hotspots Map</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </button>
+          )}
+
+          <button
+            onClick={() => navigate("/referrals")}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+          >
+            <Gift size={18} className="text-primary" />
+            <span className="flex-1 text-sm text-foreground text-left">Refer & Earn</span>
+            <ChevronRight size={16} className="text-muted-foreground" />
+          </button>
           {!isRunner && (
             <button
               onClick={() => navigate("/wallet")}
@@ -260,6 +354,7 @@ const Profile = () => {
           {[
             { icon: MapPin, label: "Saved Locations", path: "/saved-locations" },
             { icon: Settings, label: "Settings", path: "/settings" },
+            { icon: HelpCircle, label: "Help & Support", path: "/help-support" }
           ].map((item) => (
             <button
               key={item.label}

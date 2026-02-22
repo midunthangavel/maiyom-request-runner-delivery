@@ -2,17 +2,17 @@ import PageShell from "@/components/PageShell";
 import { useApp } from "@/contexts/AppContext";
 import { IndianRupee, Star, TrendingUp, Flame, Award, ChevronRight, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEarnings } from "@/hooks/useSupabase";
 
 const Earnings = () => {
   const { userProfile } = useApp();
-  // Placeholder runner stats until we have a real earnings table
-  const runner = {
-    earnings: { today: 0, weekly: 0 },
-    rating: userProfile?.rating || 5.0,
-    streak: 0,
-    completedMissions: userProfile?.completed_missions || 0
-  };
+  const { data: earnings } = useEarnings(userProfile?.id || "");
   const navigate = useNavigate();
+
+  const todayEarnings = earnings?.today || 0;
+  const weeklyEarnings = earnings?.weekly || 0;
+  const rating = userProfile?.rating || 5.0;
+  const completedMissions = userProfile?.completed_missions || 0;
 
   return (
     <PageShell>
@@ -26,28 +26,28 @@ const Earnings = () => {
               <IndianRupee size={14} className="text-primary" />
               <span className="text-xs text-muted-foreground">Today</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">₹{runner.earnings.today}</p>
+            <p className="text-xl font-display font-bold text-foreground">₹{todayEarnings.toLocaleString()}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4 shadow-card">
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp size={14} className="text-success" />
               <span className="text-xs text-muted-foreground">This Week</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">₹{runner.earnings.weekly.toLocaleString()}</p>
+            <p className="text-xl font-display font-bold text-foreground">₹{weeklyEarnings.toLocaleString()}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4 shadow-card">
             <div className="flex items-center gap-2 mb-1">
               <Star size={14} className="text-warning fill-warning" />
               <span className="text-xs text-muted-foreground">Rating</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">{runner.rating}</p>
+            <p className="text-xl font-display font-bold text-foreground">{rating}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-4 shadow-card">
             <div className="flex items-center gap-2 mb-1">
               <Flame size={14} className="text-primary" />
-              <span className="text-xs text-muted-foreground">Streak</span>
+              <span className="text-xs text-muted-foreground">Completed</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">{runner.streak} days 🔥</p>
+            <p className="text-xl font-display font-bold text-foreground">{completedMissions}</p>
           </div>
         </div>
 
@@ -55,8 +55,8 @@ const Earnings = () => {
         <div className="bg-secondary rounded-lg p-4 flex items-center gap-3 mb-4">
           <Award size={24} className="text-primary" />
           <div>
-            <p className="text-sm font-semibold text-foreground">{runner.completedMissions} Missions Completed</p>
-            <p className="text-xs text-muted-foreground">You're in the top 5% of runners!</p>
+            <p className="text-sm font-semibold text-foreground">{completedMissions} Missions Completed</p>
+            <p className="text-xs text-muted-foreground">Keep going, every mission counts!</p>
           </div>
         </div>
 

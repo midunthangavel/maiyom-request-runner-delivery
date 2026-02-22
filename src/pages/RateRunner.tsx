@@ -1,19 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Star } from "lucide-react";
-import { motion } from "framer-motion";
-import { saveReview } from "@/lib/reviewStore";
+import { ArrowLeft, Star, Loader2, IndianRupee, Heart } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useCreateReview, useMission, useOffers, useUpdateProfile } from "@/hooks/useSupabase";
+import { useApp } from "@/contexts/AppContext";
+import { useToast } from "@/hooks/use-toast";
 
 const tags = ["Fast delivery", "Friendly", "Good communication", "Careful handling", "On time", "Went extra mile"];
+const TIP_OPTIONS = [10, 20, 50];
 
 const RateRunner = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id: missionId } = useParams();
+  const { userProfile } = useApp();
+  const { toast } = useToast();
+  const createReview = useCreateReview();
+
+  const { data: mission } = useMission(missionId || "");
+  const { data: missionOffers = [] } = useOffers(missionId || "");
+
   const [rating, setRating] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
+  const [tipAmount, setTipAmount] = useState<number | null>(null);
+  const [customTip, setCustomTip] = useState("");
+  const [isFavorite, setIsFavorite] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const updateProfile = useUpdateProfile();
+
+  // Find the accepted runner for this mission
+  const acceptedOffer = missionOffers.find((o) => o.status === "accepted");
+  const runner = acceptedOffer?.runner;
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -21,17 +39,63 @@ const RateRunner = () => {
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (rating === 0) return;
-    saveReview({
-      runnerId: "r1",
-      missionId: id || "unknown",
-      rating,
-      tags: selectedTags,
-      comment,
-      reviewerName: "You",
-    });
-    setSubmitted(true);
+    if (!userProfile?.id || !missionId) return;
+
+    const runnerId = acceptedOffer?.runner_id;
+    if (!runnerId) {
+      toast({ variant: "destructive", title: "Error", description: "Could not identify the runner for this mission." });
+      return;
+    }
+
+    const finalTip = tipAmount === -1 ? Number(customTip) : (tipAmount || 0);
+
+    if (finalTip > 0 && (userProfile.wallet_balance || 0) < finalTip) {
+      toast({ variant: "destructive", title: "Insufficient Funds", description: "Your wallet balance is too low for this tip." });
+      return;
+    }
+
+    try {
+      // 1. Create Review
+      await createReview.mutateAsync({
+        runner_id: runnerId,
+        requester_id: userProfile.id,
+        mission_id: missionId,
+        rating,
+        tags: selectedTags,
+        comment,
+      });
+
+      // 2. Handle Tip Transfer
+      if (finalTip > 0) {
+        // Deduct from Requester
+        await updateProfile.mutateAsync({
+          id: userProfile.id,
+          updates: { wallet_balance: (userProfile.wallet_balance || 0) - finalTip }
+        });
+
+        // Add to Runner (Mocking a simple wallet addition here, usually via a function/RPC)
+        const currentRunnerBalance = runner?.wallet_balance || 0;
+        await updateProfile.mutateAsync({
+          id: runnerId,
+          updates: { wallet_balance: currentRunnerBalance + finalTip }
+        });
+      }
+
+      toast({
+        title: "Review Submitted 🎉",
+        description: finalTip ? `Thank you for rating and the ₹${finalTip} tip!` : "Thank you for rating the runner!",
+      });
+
+      if (isFavorite) {
+        toast({ title: "Runner Favorited ❤️", description: "They will be notified first for your next missions!" });
+      }
+
+      navigate("/missions");
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to submit review." });
+    }
   };
 
   if (submitted) {
@@ -88,12 +152,22 @@ const RateRunner = () => {
         {/* Runner */}
         <div className="text-center">
           <img
-            src="https://api.dicebear.com/7.x/avataaars/svg?seed=arjun"
+            src={runner?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${runner?.name || "runner"}`}
             alt="Runner"
             className="w-16 h-16 rounded-full bg-muted mx-auto mb-3"
           />
-          <p className="font-semibold text-foreground">Arjun Mehta</p>
-          <p className="text-xs text-muted-foreground">Mission completed</p>
+          <h2 className="text-xl font-display font-bold text-foreground mb-1">
+            {runner?.name || "Runner"}
+          </h2>
+          <p className="text-sm text-muted-foreground mb-2">How was your delivery?</p>
+
+          <button
+            onClick={() => setIsFavorite(!isFavorite)}
+            className={`flex items-center gap-1.5 mx-auto px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${isFavorite ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-card text-muted-foreground border border-border hover:bg-muted"}`}
+          >
+            <Heart size={14} className={isFavorite ? "fill-red-500 text-red-500" : ""} />
+            {isFavorite ? "Saved to Favorites" : "Add to Favorites"}
+          </button>
         </div>
 
         {/* Stars */}
@@ -164,13 +238,69 @@ const RateRunner = () => {
           </motion.div>
         )}
 
+        {/* Tipping Section */}
+        {rating > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="pt-2 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5"><IndianRupee size={16} /> Add a Tip (Optional)</p>
+              <p className="text-xs text-muted-foreground font-medium">Wallet: ₹{userProfile?.wallet_balance || 0}</p>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {TIP_OPTIONS.map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => { setTipAmount(amount); setCustomTip(""); }}
+                  className={`py-2 rounded-lg text-sm font-semibold border transition-all ${tipAmount === amount
+                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
+                    : "bg-card border-border text-foreground hover:bg-muted"
+                    }`}
+                >
+                  ₹{amount}
+                </button>
+              ))}
+              <button
+                onClick={() => setTipAmount(-1)}
+                className={`py-2 rounded-lg text-sm font-semibold border transition-all ${tipAmount === -1
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card border-border text-foreground hover:bg-muted"
+                  }`}
+              >
+                Other
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {tipAmount === -1 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-3"
+                >
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
+                    <input
+                      type="number"
+                      placeholder="Enter amount"
+                      value={customTip}
+                      onChange={(e) => setCustomTip(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2.5 rounded-lg border border-border bg-background focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm font-medium"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
         {/* Submit */}
         <button
           onClick={handleSubmit}
-          disabled={rating === 0}
+          disabled={rating === 0 || createReview.isPending}
           className="w-full py-3.5 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow disabled:opacity-40"
         >
-          Submit Review
+          {createReview.isPending ? <Loader2 size={18} className="animate-spin mx-auto" /> : "Submit Review"}
         </button>
       </div>
     </div>

@@ -77,24 +77,66 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
                 .eq('runner_id', userProfile.id)
                 .eq('status', 'accepted');
 
+            // Collect all participant IDs we need to resolve
+            const participantIds = new Set<string>();
+
+            if (myMissions) {
+                for (const m of myMissions) {
+                    const acceptedOffer = Array.isArray(m.offers) ? m.offers[0] : m.offers;
+                    if (acceptedOffer?.runner_id) participantIds.add(acceptedOffer.runner_id);
+                }
+            }
+            if (myJobs) {
+                for (const job of myJobs) {
+                    const m = job.missions;
+                    // @ts-ignore
+                    if (m?.requester_id) participantIds.add(m.requester_id);
+                }
+            }
+
+            // Batch-fetch profile names
+            let profilesMap: Record<string, { name: string; avatar_url?: string }> = {};
+            if (participantIds.size > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, name, avatar_url')
+                    .in('id', Array.from(participantIds));
+                if (profiles) {
+                    for (const p of profiles) {
+                        profilesMap[p.id] = { name: p.name, avatar_url: p.avatar_url };
+                    }
+                }
+            }
+
             const conversationsList: Conversation[] = [];
 
             // Process My Missions (I am Requester)
             if (myMissions) {
                 for (const m of myMissions) {
-                    // There should be only one accepted offer per mission usually, but specific to logic
-                    // offers is an array here due to inner join structure
                     const acceptedOffer = Array.isArray(m.offers) ? m.offers[0] : m.offers;
                     if (acceptedOffer) {
+                        const profile = profilesMap[acceptedOffer.runner_id];
                         conversationsList.push({
                             id: m.id,
-                            participantName: "Runner", // Ideally fetch profile name
-                            // participantAvatar: ...
+                            participantName: profile?.name || "Runner",
+                            participantAvatar: profile?.avatar_url,
                             lastMessage: "Mission in progress...",
                             time: "Now",
                             unreadCount: 0,
                             missionTitle: m.title,
                             status: m.status as any
+                        });
+                    }
+                    if (m.status === "disputed") {
+                        conversationsList.push({
+                            id: "support_" + m.id,
+                            participantName: "Maiyom Safety Team",
+                            participantAvatar: "https://api.dicebear.com/7.x/shapes/svg?seed=support",
+                            lastMessage: `Support ticket for: ${m.title}`,
+                            time: "Now",
+                            unreadCount: 1,
+                            missionTitle: m.title,
+                            status: "active" as any
                         });
                     }
                 }
@@ -103,20 +145,63 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
             // Process My Jobs (I am Runner)
             if (myJobs) {
                 for (const job of myJobs) {
-                    const m = job.missions;
+                    const m = job.missions as any;
                     if (m) {
+                        // @ts-ignore
+                        const profile = profilesMap[m.requester_id];
                         conversationsList.push({
                             id: m.id, // @ts-ignore
-                            participantName: "Requester", // Ideally fetch profile name
+                            participantName: profile?.name || "Requester",
+                            participantAvatar: profile?.avatar_url,
                             lastMessage: "You are the runner",
                             time: "Now",
                             unreadCount: 0, // @ts-ignore
                             missionTitle: m.title, // @ts-ignore
                             status: m.status as any
                         });
+
+                        if (m.status === "disputed") {
+                            conversationsList.push({
+                                id: "support_" + m.id,
+                                participantName: "Maiyom Safety Team",
+                                participantAvatar: "https://api.dicebear.com/7.x/shapes/svg?seed=support",
+                                lastMessage: `Support ticket for: ${m.title}`,
+                                time: "Now",
+                                unreadCount: 1,
+                                missionTitle: m.title,
+                                status: "active" as any
+                            });
+                        }
                     }
                 }
             }
+
+            // Inject Mock Community Groups
+            conversationsList.push({
+                id: "group_chennai_runners",
+                participantName: "Chennai Runners Club",
+                participantAvatar: "https://api.dicebear.com/7.x/shapes/svg?seed=chennai",
+                lastMessage: "Rajesh: Traffic alert near OMR! Avoid the toll plaza.",
+                time: "10:30 AM",
+                unreadCount: 3,
+                status: "group",
+                isGroup: true,
+                groupName: "Chennai Runners Club",
+                members: ["user1", "user2", "user3"]
+            });
+
+            conversationsList.push({
+                id: "group_urgent_help",
+                participantName: "Urgent Delivery Help",
+                participantAvatar: "https://api.dicebear.com/7.x/shapes/svg?seed=urgent",
+                lastMessage: "Sara: Can someone take over my pickup? Have a flat tire.",
+                time: "Yesterday",
+                unreadCount: 0,
+                status: "group",
+                isGroup: true,
+                groupName: "Urgent Delivery Help",
+                members: ["user1", "user4"]
+            });
 
             // Remove duplicates if any
             const unique = conversationsList.filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);

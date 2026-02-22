@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MessageSquare, Phone, CheckCircle2, Share2, Navigation } from "lucide-react";
+import { ArrowLeft, MessageSquare, Phone, CheckCircle2, Share2, Navigation, ShieldAlert, AlertTriangle, Camera, Loader2, UploadCloud } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/contexts/AppContext";
+import { useMission, useUpdateMission } from "@/hooks/useSupabase";
+import { useToast } from "@/hooks/use-toast";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -25,7 +27,11 @@ const ROUTE_POINTS: [number, number][] = [
 const Tracking = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { currentRole } = useApp();
+  const { currentRole, userProfile } = useApp();
+  const { data: mission, isLoading: loadingMission } = useMission(id || "");
+  const updateMission = useUpdateMission();
+  const { toast } = useToast();
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const runnerMarker = useRef<L.Marker | null>(null);
@@ -35,8 +41,23 @@ const Tracking = () => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [shared, setShared] = useState(false);
 
+  // OTP State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpInput, setOtpInput] = useState(["", "", "", ""]);
+  const otpType = mission?.status === "accepted" ? "pickup" : "delivery";
+
+  // SOS State
+  const [showSosModal, setShowSosModal] = useState(false);
+
+  // Photo State
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const progress = Math.round((routeIndex / (ROUTE_POINTS.length - 1)) * 100);
   const arrived = routeIndex >= ROUTE_POINTS.length - 1;
+  const isRunner = currentRole === "runner";
+  const isRequester = currentRole === "requester";
 
   // Watch user's real GPS
   useEffect(() => {
@@ -174,6 +195,71 @@ const Tracking = () => {
     }
   };
 
+  const handleOtpVerify = async () => {
+    const enteredOtp = otpInput.join("");
+    if (!mission) return;
+
+    if (otpType === "pickup" && enteredOtp === mission.pickup_otp) {
+      // Transition to In Transit with Photo Proof
+      await updateMission.mutateAsync({
+        id: mission.id,
+        updates: { status: "in_transit", pickup_photo_url: photoUrl || undefined }
+      });
+      setShowOtpModal(false);
+      setOtpInput(["", "", "", ""]);
+      setPhotoUrl(null);
+      toast({ title: "Pickup Confirmed ✅", description: "You are now in transit!" });
+    } else if (otpType === "delivery" && enteredOtp === mission.delivery_otp) {
+      // Transition to Delivered with Photo Proof
+      await updateMission.mutateAsync({
+        id: mission.id,
+        updates: { status: "delivered", delivery_photo_url: photoUrl || undefined }
+      });
+      setShowOtpModal(false);
+      setPhotoUrl(null);
+      toast({ title: "Delivery Complete 🎉", description: "Mission accomplished!" });
+      setTimeout(() => navigate(`/confirm-delivery/${id}`), 1500);
+    } else {
+      toast({ variant: "destructive", title: "Invalid OTP", description: "Please check the code and try again." });
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1); // Only allow 1 char
+    const newOtp = [...otpInput];
+    newOtp[index] = value;
+    setOtpInput(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 3) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otpInput[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  const handleTakePhoto = () => {
+    setIsUploading(true);
+    // Simulate camera/upload delay
+    setTimeout(() => {
+      setPhotoUrl("https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=400&auto=format&fit=crop");
+      setIsUploading(false);
+    }, 1500);
+  };
+
+  const handlePhotoContinue = () => {
+    setShowPhotoModal(false);
+    setShowOtpModal(true);
+  };
+
+  if (loadingMission) return <div className="p-5">Loading...</div>;
+
   return (
     <div className="min-h-screen max-w-lg mx-auto bg-background flex flex-col">
       {/* Header */}
@@ -183,6 +269,11 @@ const Tracking = () => {
             <ArrowLeft size={20} className="text-foreground" />
           </button>
           <h1 className="font-display font-semibold text-foreground flex-1">Live Tracking</h1>
+
+          <button onClick={() => setShowSosModal(true)} className="p-1.5 bg-destructive/10 text-destructive rounded-full hover:bg-destructive/20 transition-colors">
+            <ShieldAlert size={18} />
+          </button>
+
           {!arrived && (
             <span className="text-xs font-medium bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full">
               ETA ~{eta} min
@@ -206,29 +297,45 @@ const Tracking = () => {
       {/* Map */}
       <div ref={mapRef} className="flex-1 min-h-[55vh] z-0" />
 
-      {/* Status Banner */}
+      {/* Status Banner / OTP Display for Requester */}
       <AnimatePresence mode="wait">
         {arrived ? (
           <motion.div
             key="arrived"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="px-5 py-3 bg-success/10 flex items-center gap-2 justify-center"
+            className="px-5 py-3 bg-success/10 flex items-center justify-between"
           >
-            <CheckCircle2 size={18} className="text-success" />
-            <span className="text-sm font-semibold text-success">Runner has arrived!</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={18} className="text-success" />
+              <span className="text-sm font-semibold text-success">Runner has arrived!</span>
+            </div>
+            {isRequester && mission?.status === "in_transit" && (
+              <div className="flex items-center gap-2 bg-success text-success-foreground px-3 py-1 rounded shadow-sm text-xs font-bold">
+                OTP: {mission.delivery_otp}
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div
             key="onway"
-            className="px-5 py-2 bg-secondary flex items-center justify-center gap-2"
+            className="px-5 py-3 bg-secondary flex items-center justify-between"
           >
-            <motion.div
-              animate={{ scale: [1, 1.3, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="w-2 h-2 rounded-full bg-primary"
-            />
-            <span className="text-xs font-medium text-secondary-foreground">Runner is on the way</span>
+            <div className="flex items-center gap-2">
+              <motion.div
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="w-2 h-2 rounded-full bg-primary"
+              />
+              <span className="text-sm font-medium text-secondary-foreground">
+                {mission?.status === "accepted" ? "Runner is heading to pickup" : "Runner is on the way"}
+              </span>
+            </div>
+            {isRequester && mission?.status === "accepted" && (
+              <div className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-1 rounded shadow-sm text-xs font-bold">
+                OTP: {mission.pickup_otp}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -249,7 +356,7 @@ const Tracking = () => {
             <button className="p-2.5 bg-secondary rounded-full">
               <Phone size={16} className="text-secondary-foreground" />
             </button>
-            <button onClick={() => navigate("/chat/conv1")} className="p-2.5 bg-secondary rounded-full">
+            <button onClick={() => navigate(`/chat/${id}`)} className="p-2.5 bg-secondary rounded-full">
               <MessageSquare size={16} className="text-secondary-foreground" />
             </button>
             <button onClick={handleShare} className="p-2.5 bg-secondary rounded-full relative">
@@ -270,15 +377,211 @@ const Tracking = () => {
           </div>
         </div>
 
-        {arrived && (
+        {isRunner && mission?.status === "accepted" && (
+          <button
+            onClick={() => setShowPhotoModal(true)}
+            className="w-full py-3 mt-3 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow flex items-center justify-center gap-2"
+          >
+            <Camera size={18} /> Confirm Pickup
+          </button>
+        )}
+
+        {isRunner && mission?.status === "in_transit" && arrived && (
+          <button
+            onClick={() => setShowPhotoModal(true)}
+            className="w-full py-3 mt-3 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow flex items-center justify-center gap-2"
+          >
+            <Camera size={18} /> Confirm Delivery
+          </button>
+        )}
+
+        {isRequester && arrived && mission?.status === "delivered" && (
           <button
             onClick={() => navigate(`/confirm-delivery/${id}`)}
-            className="w-full py-3 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow"
+            className="w-full py-3 mt-3 rounded-lg bg-gradient-primary text-primary-foreground font-semibold text-sm shadow-glow"
           >
-            Confirm Delivery
+            Rate & Confirm
           </button>
         )}
       </div>
+
+      {/* Photo Proof Modal */}
+      <AnimatePresence>
+        {showPhotoModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[2000] bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl flex flex-col items-center"
+            >
+              <h3 className="text-xl font-display font-bold text-center mb-2">
+                Photo Proof
+              </h3>
+              <p className="text-sm text-center text-muted-foreground mb-6">
+                Take a clear photo of the item at the {otpType} location.
+              </p>
+
+              {photoUrl ? (
+                <div className="w-full h-48 rounded-xl overflow-hidden mb-6 relative border border-border">
+                  <img src={photoUrl} alt="Proof" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => setPhotoUrl(null)}
+                    className="absolute top-2 right-2 bg-background/80 p-1.5 rounded-full backdrop-blur-sm"
+                  >
+                    <AlertTriangle size={16} className="text-foreground" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleTakePhoto}
+                  disabled={isUploading}
+                  className="w-full h-48 rounded-xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-3 mb-6 transition-colors hover:border-primary/50 hover:bg-primary/5"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 size={32} className="text-primary animate-spin" />
+                      <span className="text-sm font-medium text-foreground">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera size={32} className="text-muted-foreground" />
+                      <span className="text-sm font-medium text-foreground">Tap to open Camera</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowPhotoModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePhotoContinue}
+                  disabled={!photoUrl}
+                  className="flex-1 py-3 rounded-xl bg-gradient-primary text-primary-foreground font-semibold shadow-glow disabled:opacity-50"
+                >
+                  Continue
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* OTP Modal */}
+      <AnimatePresence>
+        {showOtpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[2000] bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 shadow-2xl"
+            >
+              <h3 className="text-xl font-display font-bold text-center mb-2">
+                {otpType === "pickup" ? "Verify Pickup" : "Verify Delivery"}
+              </h3>
+              <p className="text-sm text-center text-muted-foreground mb-6">
+                Ask the requester for their 4-digit {otpType} OTP to secure this step.
+              </p>
+
+              <div className="flex justify-center gap-3 mb-8">
+                {otpInput.map((digit, i) => (
+                  <input
+                    key={i}
+                    id={`otp-${i}`}
+                    type="number"
+                    value={digit}
+                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                    className="w-14 h-16 text-center text-2xl font-bold bg-background border-2 border-border rounded-xl focus:border-primary outline-none transition-colors"
+                  />
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowOtpModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-border text-foreground font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleOtpVerify}
+                  disabled={otpInput.join("").length !== 4}
+                  className="flex-1 py-3 rounded-xl bg-gradient-primary text-primary-foreground font-semibold shadow-glow disabled:opacity-50"
+                >
+                  Verify
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SOS Modal */}
+      <AnimatePresence>
+        {showSosModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[3000] bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="w-full max-w-sm bg-card border border-destructive/20 rounded-2xl p-6 shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="text-xl font-display font-bold text-center mb-2 text-foreground">
+                Emergency SOS
+              </h3>
+              <p className="text-sm text-center text-muted-foreground mb-6">
+                Are you in an emergency? This will immediately alert Maiyom Support and share your live location.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setShowSosModal(false);
+                    toast({ variant: "destructive", title: "SOS Activated", description: "Admin support has been alerted. Calling 112..." });
+                    window.open("tel:112");
+                  }}
+                  className="w-full py-3.5 rounded-xl bg-destructive text-destructive-foreground font-semibold shadow-lg text-sm flex items-center justify-center gap-2"
+                >
+                  <Phone size={18} />
+                  Call Emergency (112)
+                </button>
+
+                <button
+                  onClick={() => setShowSosModal(false)}
+                  className="w-full py-3 rounded-xl border border-border text-foreground font-medium text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
